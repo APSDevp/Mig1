@@ -1,0 +1,58 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.CBSLOG.
+       DATE-WRITTEN. 28/08/2019.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+        01 WS-ACCOUNT-NO-T PIC S9(18).
+        01 WS-TIMESTAMP PIC X(26).
+               EXEC SQL
+                 INCLUDE CBSLOG
+               END-EXEC.
+               EXEC SQL
+                 INCLUDE SQLCA
+               END-EXEC.
+
+       LINKAGE SECTION.
+       01 DFHCOMMAREA.
+           02 LOGREQ.
+           COPY LOGREQ.
+           02 LOGRES REDEFINES LOGREQ.
+           COPY LOGRES.
+
+       PROCEDURE DIVISION.
+           PERFORM INSERT-TO-TABLE THRU INSERT-TO-TABLE-EXIT
+           EXEC CICS RETURN END-EXEC.
+
+       INSERT-TO-TABLE.
+           MOVE FUNCTION CURRENT-DATE TO H4-TIME-STAMP.
+           MOVE ACCOUNT-NO TO WS-ACCOUNT-NO-T.
+           COMPUTE H4-ACCOUNT-NUMBER = WS-ACCOUNT-NO-T.
+           MOVE API-NAME TO H4-API-TYPE.
+           MOVE API-COPYBOOK TO H4-API-COPYBOOK.
+           MOVE API-TYPE TO H4-API-TYPE.
+           EXEC SQL
+           INSERT INTO CBS_API_LOG_DTL
+               VALUES (:H4-ACCOUNT-NUMBER, :H4-API-TYPE,
+                       :H4-API-COPYBOOK, :H4-API-NAME, :H4-TIME-STAMP)
+           END-EXEC.
+           EVALUATE SQLCODE
+             WHEN 0
+               MOVE 'INSERT SUCCESSFUL' TO MESSAGES
+               CONTINUE
+             WHEN 100
+               MOVE 'INSERT FAILED' TO MESSAGES
+               PERFORM ERROR-PARA THRU ERROR-PARA-EXIT
+               EXEC CICS RETURN END-EXEC
+             WHEN OTHER
+               MOVE 'SQLCODE IS NON ZERO' TO MESSAGES
+               PERFORM ERROR-PARA THRU ERROR-PARA-EXIT
+               EXEC CICS RETURN END-EXEC
+           END-EVALUATE.
+       INSERT-TO-TABLE-EXIT.
+           EXIT.
+
+       ERROR-PARA.
+            DISPLAY 'SQLCODE IS :' SQLCODE.
+            DISPLAY 'ERR MESSAGE:' MESSAGES.
+       ERROR-PARA-EXIT.
+            EXIT.
